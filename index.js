@@ -123,7 +123,8 @@ app.use(async ({ request }) => {
         case '怎麼吃':
           break;
         default:
-          replyMessage(replyToken, '公鯊小');
+          if (source.type === 'user')
+            replyMessage(replyToken, '公鯊小');
           break;
       }
     }
