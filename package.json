@@ -6,11 +6,13 @@
     "@line/bot-sdk": "^7.4.0",
     "dotenv": "^16.0.0",
     "koa": "^2.13.4",
-    "koa-bodyparser": "^4.3.0"
+    "koa-bodyparser": "^4.3.0",
+    "lodash": "^4.17.21",
+    "mongoose": "^6.2.7"
   },
   "license": "MIT",
   "name": "eatwat",
   "author": "weizhihuang",
   "repository": "https://github.com/weizhihuang/eatwat",
-  "version": "0.1.0"
+  "version": "1.0.0-alpha"
 }
