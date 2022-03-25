@@ -4,9 +4,10 @@ const crypto = require('crypto');
 const mongoose = require('mongoose');
 const line = require('@line/bot-sdk');
 const bodyParser = require('koa-bodyparser');
-const { slice, each, map, chain, isNaN, toNumber, sample } = require('lodash');
+const { slice, each, map, chain, isNaN, toNumber, sample, min } = require('lodash');
 
 const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六'];
+const MAX_SHOP_LEN = 30;
 
 // Dotenv
 require('dotenv').config({ path: path.join(__dirname, '.env.local') });
@@ -40,7 +41,7 @@ function parseShop({ name, closed, rate }) {
   const remark = [];
   if (closed.length) remark.push(`休：${map(closed, day => WEEKDAYS[day]).join('、')}`);
   remark.push(`機率：${rate}`);
-  return `${name}（${remark.join('，')}）`;
+  return `${name} （${remark.join('，')}）`; // space for url split
 }
 
 // Koa
@@ -64,11 +65,12 @@ app.use(async ({ request }, next) => {
 
 app.use(async ({ request }) => {
   request.body?.events?.forEach(async ({ type, message, source, replyToken }) => {
-    //t leaved group or nobody in group // source.type === 'group'
+    //t blocked or deleted // source.type === 'user'
+    //t leaved group or nobody in group? // source.type === 'group'
     if (type === 'message') {
       const sourceId = source.userId || source.groupId;
-      const cmd = message.text.split(' ');
-      const name = cmd[1];
+      const cmd = message.text?.split(' ') || []; // prevent undefined error
+      const name = cmd[1] || '';
       switch (cmd[0]) {
         case '戳':
           console.log(sourceId);
@@ -79,15 +81,17 @@ app.use(async ({ request }) => {
             map(await Shop.find({ sourceId }), parseShop).join('\n') || '不知道（選項尚未建立）'); // timezone
           break;
         case '可吃':
-          if (await Shop.findOne({ name, sourceId })) {
-            replyMessage(replyToken, `不要（${name} 已存在）`);
+          if (!name || await Shop.findOne({ name, sourceId })) {
+            replyMessage(replyToken, `不要（${name} 建立失敗）`);
+          } else if (name.length > MAX_SHOP_LEN) {
+            replyMessage(replyToken, `不要（${slice(name, 0, 15).join('')}... 建立失敗）`);
           } else {
             let closed = [];
             let rate = 1;
             each(slice(cmd, 2), c => {
               switch (c[0]) {
                 case '-':
-                  closed = chain([...c].sort()).sortedUniq().map(day => day % 7).filter(day => !isNaN(day)).value();
+                  closed = chain([...c].sort()).map(day => day % 7).sortedUniq().filter(day => !isNaN(day)).value();
                   break;
                 case '.':
                   rate = toNumber(c) || 1;
