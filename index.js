@@ -116,6 +116,11 @@ app.use(async ({ request }) => {
           await Shop.deleteMany({ sourceId });
           replyMessage(replyToken, '不吃就不吃（已清除）');
           break;
+        case '怎麼吃':
+          break;
+        default:
+          replyMessage(replyToken, '公鯊小');
+          break;
       }
     }
   });
