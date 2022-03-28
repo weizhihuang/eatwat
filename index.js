@@ -45,30 +45,25 @@ function parseShop({ name, closed, rate }) {
 }
 
 // Koa
-app.use(async ({ method, status }, next) => {
-  try {
-    if (method !== 'POST') throw '';
-    await next();
-  } catch {
-    status = 404;
-  }
+app.use(async ({ method }, next) => {
+  if (method !== 'POST') return;
+  await next();
 });
 
 app.use(async ({ request }, next) => {
   const signature = crypto
     .createHmac('SHA256', process.env.CHANNEL_SECRET)
     .update(JSON.stringify(request.body)).digest('base64');
-
-  if (request.header['x-line-signature'] !== signature) throw '';
+  // if (request.header['x-line-signature'] !== signature) return;
   await next();
 });
 
-app.use(async ({ request }) => {
-  request.body?.events?.forEach(async ({ type, message, source, replyToken }) => {
+app.use(async ctx => {
+  ctx.request.body?.events?.forEach(async ({ type, message, source, replyToken }) => {
     //t blocked or deleted // source.type === 'user'
     //t leaved group or nobody in group? // source.type === 'group'
     if (type === 'message') {
-      const sourceId = source.userId || source.groupId;
+      const sourceId = source.groupId || source.userId;
       const cmd = message.text?.split(' ') || []; // prevent undefined error
       const name = cmd[1] || '';
       switch (cmd[0]) {
@@ -129,6 +124,7 @@ app.use(async ({ request }) => {
       }
     }
   });
+  ctx.status = 200;
 });
 
 app.listen(process.env.PORT || 3000);
