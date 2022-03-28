@@ -4,10 +4,10 @@ const crypto = require('crypto');
 const mongoose = require('mongoose');
 const line = require('@line/bot-sdk');
 const bodyParser = require('koa-bodyparser');
-const { slice, each, map, chain, isNaN, toNumber, sample, min } = require('lodash');
+const { each, map, chain, toNumber, sample } = require('lodash');
 
 const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六'];
-const MAX_SHOP_LEN = 30;
+const MAX_SHOP_NAME_LEN = 30;
 
 // Dotenv
 require('dotenv').config({ path: path.join(__dirname, '.env.local') });
@@ -59,48 +59,50 @@ app.use(async ({ request }, next) => {
 });
 
 app.use(async ctx => {
-  ctx.request.body?.events?.forEach(async ({ type, message, source, replyToken }) => {
+  each(ctx.request.body?.events, (async ({ type, message, source, replyToken }) => {
     //t blocked or deleted // source.type === 'user'
     //t leaved group or nobody in group? // source.type === 'group'
     if (type === 'message') {
       const sourceId = source.groupId || source.userId;
-      const cmd = message.text?.split(' ') || []; // prevent undefined error
-      const name = cmd[1] || '';
-      switch (cmd[0]) {
+      const params = chain(message.text).split(' ').filter(Boolean).value();
+      const cmd = params[0];
+      const name = params[1] || '';
+
+      switch (cmd) {
         case '戳':
           console.log(sourceId);
           replyMessage(replyToken, `戳屁戳（版本：v${require('./package.json').version}）`);
           break;
         case '有啥':
           replyMessage(replyToken,
-            map(await Shop.find({ sourceId }), parseShop).join('\n') || '不知道（選項尚未建立）'); // timezone
+            map(await Shop.find({ sourceId }), parseShop).join('\n') || '不知道（選項尚未建立）');
           break;
         case '可吃':
           if (!name || await Shop.findOne({ name, sourceId })) {
             replyMessage(replyToken, `不要（${name} 建立失敗）`);
-          } else if (name.length > MAX_SHOP_LEN) {
-            replyMessage(replyToken, `不要（${slice(name, 0, 15).join('')}... 建立失敗）`);
+          } else if (name.length > MAX_SHOP_NAME_LEN) {
+            replyMessage(replyToken, `不要（${name.slice(0, 15)}... 建立失敗）`);
           } else {
             let closed = [];
             let rate = 1;
-            each(slice(cmd, 2), c => {
-              switch (c[0]) {
+            chain(params).slice(2).each(param => {
+              switch (param[0]) {
                 case '-':
-                  closed = chain([...c].sort()).map(day => day % 7).sortedUniq().filter(day => !isNaN(day)).value();
+                  closed = chain([...param].sort()).map(day => day % 7).sortedUniq().filter(day => !isNaN(day)).value();
                   break;
                 case '.':
-                  rate = toNumber(c) || 1;
+                  rate = toNumber(c) || rate;
                   break;
               }
-            })
+            });
             const shop = new Shop({ name, sourceId, closed, rate });
             replyMessage(replyToken, `好（${parseShop(await shop.save())} 已建立）`);
           }
           break;
         case '吃啥':
           //t? help deciding
-          const filterList = chain(cmd).filter(c => c[0] === '-').map(c => slice(c, 1).join('')).value();
-          const shops = await Shop.find({ name: { $nin: filterList }, sourceId, closed: { $ne: new Date().getDay() } })
+          const filterList = chain(params).filter(param => param[0] === '-').map(param => param.slice(1)).value();
+          const shops = await Shop.find({ name: { $nin: filterList }, sourceId, closed: { $ne: new Date().getDay() } }) // timezone
           let shop;
           do {
             shop = sample(shops);
@@ -123,7 +125,7 @@ app.use(async ctx => {
           break;
       }
     }
-  });
+  }));
   ctx.status = 200;
 });
 
