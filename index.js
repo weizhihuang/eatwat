@@ -54,7 +54,7 @@ app.use(async ({ request }, next) => {
   const signature = crypto
     .createHmac('SHA256', process.env.CHANNEL_SECRET)
     .update(JSON.stringify(request.body)).digest('base64');
-  // if (request.header['x-line-signature'] !== signature) return;
+  if (request.header['x-line-signature'] !== signature) return;
   await next();
 });
 
