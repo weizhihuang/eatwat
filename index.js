@@ -91,7 +91,7 @@ app.use(async ctx => {
                   closed = chain([...param].sort()).map(day => day % 7).sortedUniq().filter(day => !isNaN(day)).value();
                   break;
                 case '.':
-                  rate = toNumber(c) || rate;
+                  rate = toNumber(param) || rate;
                   break;
               }
             });
