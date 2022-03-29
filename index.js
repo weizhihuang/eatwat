@@ -94,7 +94,7 @@ app.use(async ctx => {
                   rate = toNumber(param) || rate;
                   break;
               }
-            });
+            }).value();
             const shop = new Shop({ name, sourceId, closed, rate });
             replyMessage(replyToken, `好（${parseShop(await shop.save())} 已建立）`);
           }
