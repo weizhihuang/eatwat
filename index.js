@@ -61,70 +61,74 @@ app.use(async ({ request }, next) => {
 
 app.use(async ctx => {
   each(ctx.request.body?.events, async ({ type, message, source, replyToken }) => {
-    //t blocked or deleted // source.type === 'user'
-    //t leaved group or nobody in group? // source.type === 'group'
-    if (type === 'message') {
-      const sourceId = source.groupId || source.userId;
-      replyMessage(replyToken, (await Promise.all(map(message.text.split('\n'), async text => {
-        const params = chain(text).split(' ').filter(Boolean).value();
-        const cmd = params[0];
-        const name = params[1] || '';
+    const sourceId = source.groupId || source.userId;
+    switch (type) {
+      case 'message':
+        replyMessage(replyToken, (await Promise.all(map(message.text.split('\n'), async text => {
+          const params = chain(text).split(' ').filter(Boolean).value();
+          const cmd = params[0];
+          const name = params[1] || '';
 
-        switch (cmd) {
-          case '戳':
-            console.log(sourceId);
-            return `戳屁戳（版本：v${require('./package.json').version}）`;
-          case '有啥':
-            return map(await Shop.find({ sourceId }), parseShop).join('\n') || '不知道（選項尚未建立）';
-          case '可吃':
-            if (!name || await Shop.findOne({ name, sourceId })) {
-              return `不要（${name} 建立失敗）`;
-            } else if (name.length > MAX_SHOP_NAME_LEN) {
-              return `不要（${name.slice(0, 15)}... 建立失敗）`;
-            } else {
-              let closed = [];
-              let rate = 1;
-              chain(params).slice(2).each(param => {
-                switch (param[0]) {
-                  case '-':
-                    closed = chain([...param].sort()).map(day => day % 7).sortedUniq().filter(day => !isNaN(day)).value();
-                    break;
-                  case '.':
-                    rate = toNumber(param) || rate;
-                    break;
-                }
-              }).value();
-              const shop = new Shop({ name, sourceId, closed, rate });
-              return `好（${parseShop(await shop.save())} 已建立）`;
-            }
-          case '吃啥':
-            const filterList = chain(params).filter(param => param[0] === '-').map(param => param.slice(1)).value();
-            const shops = await Shop.find({ name: { $nin: filterList }, sourceId, closed: { $ne: new Date().getDay() } }) // timezone
-            let shop;
-            do {
-              shop = sample(shops);
-            } while (shop && shop.rate < Math.random());
-            return shop ? parseShop(shop) : '不知道（沒有選項）';
-          case '不吃':
-            return (await Shop.deleteOne({ name, sourceId })).deletedCount ? `不吃就不吃（${name} 已刪除）` : `你要確定欸（${name} 不存在）`;
-          case '不吃了':
-            await Shop.deleteMany({ sourceId });
-            return '不吃就不吃（已清除）';
-          case '很匯':
-            return map(await Shop.find({ sourceId }), shop => {
-              const { name, closed, rate } = pick(shop, ['name','closed','rate']);
-              return `可吃 ${name}${closed.length ? ' -' + closed.join('') : ''}${rate - 1 ? ' ' + rate.toString().slice(1) : ''}`;
-            }).join('\n');
-          case '要吃啥':
-            return sample(slice(params, 1)) || '不知道（沒有選項）';
-          case '怎麼吃':
-            break;
-          default:
-            if (source.type === 'user')
-              return '公鯊小';
-            break;
-        }
-      }))).join('\n'));
+          switch (cmd) {
+            case '戳':
+              console.log(sourceId);
+              return `戳屁戳（版本：v${require('./package.json').version}）`;
+            case '有啥':
+              return map(await Shop.find({ sourceId }), parseShop).join('\n') || '不知道（選項尚未建立）';
+            case '可吃':
+              if (!name || await Shop.findOne({ name, sourceId })) {
+                return `不要（${name} 建立失敗）`;
+              } else if (name.length > MAX_SHOP_NAME_LEN) {
+                return `不要（${name.slice(0, 15)}... 建立失敗）`;
+              } else {
+                let closed = [];
+                let rate = 1;
+                chain(params).slice(2).each(param => {
+                  switch (param[0]) {
+                    case '-':
+                      closed = chain([...param].sort()).map(day => day % 7).sortedUniq().filter(day => !isNaN(day)).value();
+                      break;
+                    case '.':
+                      rate = toNumber(param) || rate;
+                      break;
+                  }
+                }).value();
+                const shop = new Shop({ name, sourceId, closed, rate });
+                return `好（${parseShop(await shop.save())} 已建立）`;
+              }
+            case '吃啥':
+              const filterList = chain(params).filter(param => param[0] === '-').map(param => param.slice(1)).value();
+              const shops = await Shop.find({ name: { $nin: filterList }, sourceId, closed: { $ne: new Date().getDay() } }) //! timezone
+              let shop;
+              do {
+                shop = sample(shops);
+              } while (shop && shop.rate < Math.random());
+              return shop ? parseShop(shop) : '不知道（沒有選項）';
+            case '不吃':
+              return (await Shop.deleteOne({ name, sourceId })).deletedCount ? `不吃就不吃（${name} 已刪除）` : `你要確定欸（${name} 不存在）`;
+            case '不吃了':
+              await Shop.deleteMany({ sourceId });
+              return '不吃就不吃（已清除）';
+            case '很匯':
+              return map(await Shop.find({ sourceId }), shop => {
+                const { name, closed, rate } = pick(shop, ['name', 'closed', 'rate']);
+                return `可吃 ${name}${closed.length ? ' -' + closed.join('') : ''}${rate - 1 ? ' ' + rate.toString().slice(1) : ''}`;
+              }).join('\n');
+            case '要吃啥':
+              return sample(slice(params, 1)) || '不知道（沒有選項）';
+            case '怎麼吃':
+              break;
+            default:
+              if (source.type === 'user')
+                return '公鯊小';
+              break;
+          }
+        }))).join('\n'));
+        break;
+        case 'unfollow':
+        case 'leave':
+          await Shop.deleteMany({ sourceId });
+          break;
     }
   });
   ctx.status = 200;
