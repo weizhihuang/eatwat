@@ -4,7 +4,7 @@ const crypto = require('crypto');
 const mongoose = require('mongoose');
 const line = require('@line/bot-sdk');
 const bodyParser = require('koa-bodyparser');
-const { each, map, chain, toNumber, sample, pick } = require('lodash');
+const { each, map, chain, toNumber, sample, pick, slice } = require('lodash');
 
 const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六'];
 const MAX_SHOP_NAME_LEN = 30;
@@ -98,7 +98,6 @@ app.use(async ctx => {
               return `好（${parseShop(await shop.save())} 已建立）`;
             }
           case '吃啥':
-            // t? help deciding
             const filterList = chain(params).filter(param => param[0] === '-').map(param => param.slice(1)).value();
             const shops = await Shop.find({ name: { $nin: filterList }, sourceId, closed: { $ne: new Date().getDay() } }) // timezone
             let shop;
@@ -116,6 +115,8 @@ app.use(async ctx => {
               const { name, closed, rate } = pick(shop, ['name','closed','rate']);
               return `可吃 ${name}${closed.length ? ' -' + closed.join('') : ''}${rate - 1 ? ' ' + rate.toString().slice(1) : ''}`;
             }).join('\n');
+          case '要吃啥':
+            return sample(slice(params, 1)) || '不知道（沒有選項）';
           case '怎麼吃':
             break;
           default:
