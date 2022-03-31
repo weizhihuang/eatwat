@@ -75,6 +75,8 @@ app.use(async ctx => {
               return `戳屁戳（版本：v${require('./package.json').version}）`;
             case '有啥':
               return map(await Shop.find({ sourceId }), parseShop).join('\n') || '不知道（選項尚未建立）';
+            case '今天有啥':
+              return map(await Shop.find({ sourceId, closed: { $ne: new Date().getDay() } }), parseShop).join('\n') || '不知道（選項尚未建立）'; //! timezone
             case '可吃':
               if (!name || await Shop.findOne({ name, sourceId })) {
                 return `不要（${name} 建立失敗）`;
