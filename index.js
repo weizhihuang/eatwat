@@ -45,6 +45,24 @@ function parseShop({ name, closed, rate }) {
   return `${name} （${remark.join('，')}）`; // space for url split
 }
 
+function handleParams(params) {
+  let closed = [];
+  let rate = 1;
+
+  chain(params).slice(2).each(param => {
+    switch (param[0]) {
+      case '-':
+        closed = chain(param).map(day => day % 7).uniq().filter(day => !isNaN(day)).value();
+        break;
+      case '.':
+        rate = toNumber(param) || rate;
+        break;
+    }
+  }).value();
+
+  return { closed, rate };
+}
+
 // Koa
 app.use(async ({ method }, next) => {
   if (method !== 'POST') return;
@@ -83,19 +101,7 @@ app.use(async ctx => {
               } else if (name.length > MAX_SHOP_NAME_LEN) {
                 return `不要（${name.slice(0, 15)}... 建立失敗）`;
               } else {
-                let closed = [];
-                let rate = 1;
-                chain(params).slice(2).each(param => {
-                  switch (param[0]) {
-                    case '-':
-                      closed = chain([...param].sort()).map(day => day % 7).sortedUniq().filter(day => !isNaN(day)).value();
-                      break;
-                    case '.':
-                      rate = toNumber(param) || rate;
-                      break;
-                  }
-                }).value();
-                const shop = new Shop({ name, sourceId, closed, rate });
+                const shop = new Shop({ name, sourceId, ...handleParams(params) });
                 return `好（${parseShop(await shop.save())} 已建立）`;
               }
             case '吃啥':
@@ -106,6 +112,11 @@ app.use(async ctx => {
                 shop = sample(shops);
               } while (shop && shop.rate < Math.random());
               return shop ? parseShop(shop) : '不知道（沒有選項）';
+            case '改吃':
+              if ((await Shop.updateOne({ name, sourceId }, { $set: handleParams(params) })).modifiedCount)
+                return `好（${parseShop(await Shop.findOne({ name, sourceId }))} 已更新）`;
+              else
+                return `不要（${name} 更新失敗）`;
             case '不吃':
               return (await Shop.deleteOne({ name, sourceId })).deletedCount ? `不吃就不吃（${name} 已刪除）` : `你要確定欸（${name} 不存在）`;
             case '不吃了':
