@@ -82,7 +82,7 @@ app.use(async ctx => {
     const sourceId = source.groupId || source.userId;
     switch (type) {
       case 'message':
-        replyMessage(replyToken, (await Promise.all(map(message.text.split('\n'), async text => {
+        replyMessage(replyToken, (await Promise.all(map(message.text?.split('\n'), async text => {
           const params = chain(text).split(' ').filter(Boolean).value();
           const cmd = params[0];
           const name = params[1] || '';
